@@ -1211,12 +1211,25 @@
   function resizeCanvas() {
     const container = document.getElementById('game-container');
     const stage = document.getElementById('game-stage');
+    const logo = document.getElementById('logo');
     const cw = container.clientWidth;
     const ch = container.clientHeight;
     const scale = Math.min(cw / WIDTH, ch / HEIGHT);
-    canvas.style.width = WIDTH * scale + 'px';
-    canvas.style.height = HEIGHT * scale + 'px';
+    const displayW = WIDTH * scale;
+    const displayH = HEIGHT * scale;
+    canvas.style.width = displayW + 'px';
+    canvas.style.height = displayH + 'px';
     if (stage) stage.style.setProperty('--game-scale', String(scale));
+    if (logo) {
+      const logoW = Math.max(48, Math.round(displayW * 0.16));
+      const logoH = Math.max(16, Math.round(displayH * 0.07));
+      logo.style.width = logoW + 'px';
+      logo.style.height = 'auto';
+      logo.style.maxWidth = logoW + 'px';
+      logo.style.maxHeight = logoH + 'px';
+      logo.style.right = Math.max(4, Math.round(10 * scale)) + 'px';
+      logo.style.bottom = Math.max(4, Math.round(10 * scale)) + 'px';
+    }
   }
 
   function handleMenuClick(clientX, clientY) {
@@ -1337,6 +1350,9 @@
     resizeCanvas();
 
     window.addEventListener('resize', resizeCanvas);
+    window.addEventListener('orientationchange', function () {
+      setTimeout(resizeCanvas, 200);
+    });
     document.addEventListener('visibilitychange', function () {
       paused = document.hidden;
       if (!paused) lastTime = performance.now();

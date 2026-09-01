@@ -44,12 +44,12 @@ body {
 
 #logo {
   position: absolute;
-  right: calc(12px * var(--game-scale, 1));
-  bottom: calc(12px * var(--game-scale, 1));
-  width: auto;
+  right: 8px;
+  bottom: 8px;
+  width: 16vw;
+  max-width: 160px;
   height: auto;
-  max-width: min(22%, calc(200px * var(--game-scale, 1)));
-  max-height: min(10%, calc(48px * var(--game-scale, 1)));
+  max-height: 7vh;
   object-fit: contain;
   object-position: right bottom;
   z-index: 5;
