@@ -20,7 +20,7 @@
   const PLAYER_SIZE = 36;
   const HITBOX_PAD = 6;
   const CHANNEL_STEP = 8;
-  const LABEL_SPACING = 300;
+  const LABEL_SPACING = 420;
   const BOMB_SIZE = 46;
   const BOMB_FIRST = 700;
   const BOMB_SPACING = 560;
@@ -730,7 +730,7 @@
 
   function drawChannelLine(kind) {
     const isImport = kind === 'import';
-    ctx.strokeStyle = isImport ? '#c0392b' : '#27ae60';
+    ctx.strokeStyle = isImport ? '#1e8449' : '#c0392b';
     ctx.lineWidth = 4;
     ctx.beginPath();
     let started = false;
@@ -747,7 +747,7 @@
     }
     ctx.stroke();
 
-    ctx.fillStyle = isImport ? '#e74c3c' : '#2ecc71';
+    ctx.fillStyle = isImport ? '#2ecc71' : '#e74c3c';
     const tickOffset = isImport ? 0 : LABEL_SPACING / 2;
     const firstTick = Math.floor((scrollX + tickOffset) / LABEL_SPACING);
     const lastTick = Math.ceil((scrollX + WIDTH + tickOffset) / LABEL_SPACING);
@@ -762,7 +762,7 @@
   }
 
   function drawChannelLabels() {
-    ctx.font = '10px "Press Start 2P", monospace';
+    ctx.font = '9px "Press Start 2P", monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
 
@@ -773,14 +773,14 @@
       const importWorldX = i * LABEL_SPACING + LABEL_SPACING * 0.2;
       const exportWorldX = i * LABEL_SPACING + LABEL_SPACING * 0.7;
 
-      drawLabel('IMPORT', importWorldX, '#c0392b', -16, 'import');
-      drawLabel('EXPORT', exportWorldX, '#1e8449', 26, 'export');
+      drawLabel('IMPORT PARITY', importWorldX, '#1e8449', -16, 'import');
+      drawLabel('EXPORT PARITY', exportWorldX, '#c0392b', 26, 'export');
     }
   }
 
   function drawLabel(text, worldX, color, yOffset, kind) {
     const sx = worldX - scrollX;
-    if (sx < 80 || sx > WIDTH - 80) return;
+    if (sx < 120 || sx > WIDTH - 120) return;
 
     const ch = sampleChannel(sx);
     const y = (kind === 'import' ? ch.importY : ch.exportY) + yOffset;
@@ -988,7 +988,7 @@
     ctx.fillText('Space / Click / Tap to fly', WIDTH / 2, HEIGHT - 60);
     ctx.fillStyle = '#95a5a6';
     ctx.font = '9px "Press Start 2P", monospace';
-    ctx.fillText('Stay between IMPORT and EXPORT', WIDTH / 2, HEIGHT - 36);
+    ctx.fillText('Stay between IMPORT PARITY and EXPORT PARITY', WIDTH / 2, HEIGHT - 36);
     ctx.fillText('Dodge the AMIM bombs', WIDTH / 2, HEIGHT - 18);
 
     drawLeaderboard(WIDTH / 2, 286);
