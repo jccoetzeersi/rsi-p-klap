@@ -29,6 +29,7 @@ body {
   position: relative;
   display: inline-block;
   line-height: 0;
+  overflow: hidden;
 }
 
 #game-canvas {
@@ -43,12 +44,14 @@ body {
 
 #logo {
   position: absolute;
-  right: 12px;
-  bottom: 12px;
-  max-width: 240px;
-  max-height: 56px;
+  right: calc(12px * var(--game-scale, 1));
+  bottom: calc(12px * var(--game-scale, 1));
   width: auto;
   height: auto;
+  max-width: min(22%, calc(200px * var(--game-scale, 1)));
+  max-height: min(10%, calc(48px * var(--game-scale, 1)));
+  object-fit: contain;
+  object-position: right bottom;
   z-index: 5;
   image-rendering: auto;
   image-rendering: high-quality;

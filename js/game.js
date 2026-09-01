@@ -1210,11 +1210,13 @@
 
   function resizeCanvas() {
     const container = document.getElementById('game-container');
+    const stage = document.getElementById('game-stage');
     const cw = container.clientWidth;
     const ch = container.clientHeight;
     const scale = Math.min(cw / WIDTH, ch / HEIGHT);
     canvas.style.width = WIDTH * scale + 'px';
     canvas.style.height = HEIGHT * scale + 'px';
+    if (stage) stage.style.setProperty('--game-scale', String(scale));
   }
 
   function handleMenuClick(clientX, clientY) {
