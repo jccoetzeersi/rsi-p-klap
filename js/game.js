@@ -30,9 +30,9 @@
   const SLAP_TEXT_AT = 44;
   const BEST_KEY = 'pklap-best-score';
   const LEADERBOARD_SIZE = 10;
-  const LEADERBOARD_API =
-    'https://crudcrud.com/api/4fe0dcc1fe994c67b40c6d568278c3f9/leaderboard';
-  const LEADERBOARD_DOC_ID = '6a970433188cb503e8368310';
+  const SUPABASE_URL = 'https://bgyllkaaaavkuyskiydp.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_s2fpA7Lr-2fc__XUMZ11JA_QwGt1wH_';
+  const SUPABASE_SCORES = SUPABASE_URL + '/rest/v1/pklap_scores';
 
   const COMMODITIES = [
     { id: 'corn', name: 'Corn', color: '#f4d03f' },
@@ -221,22 +221,32 @@
     return value > leaderboard[leaderboard.length - 1].score;
   }
 
+  function supabaseHeaders(extra) {
+    const headers = {
+      apikey: SUPABASE_ANON_KEY,
+      Accept: 'application/json',
+    };
+    if (extra) {
+      Object.keys(extra).forEach(function (key) {
+        headers[key] = extra[key];
+      });
+    }
+    return headers;
+  }
+
   function fetchLeaderboard(signal) {
-    return fetch(LEADERBOARD_API, {
+    const url =
+      SUPABASE_SCORES +
+      '?select=initials,score&order=score.desc&limit=' +
+      LEADERBOARD_SIZE;
+    return fetch(url, {
       method: 'GET',
-      headers: { Accept: 'application/json' },
+      headers: supabaseHeaders(),
       signal: signal,
     }).then(function (res) {
       if (!res.ok) throw new Error('leaderboard http ' + res.status);
       return res.json();
     }).then(function (data) {
-      if (Array.isArray(data)) {
-        const doc =
-          data.filter(function (row) {
-            return row && row._id === LEADERBOARD_DOC_ID;
-          })[0] || data[0];
-        return sanitizeLeaderboard(doc || { scores: [] });
-      }
       return sanitizeLeaderboard(data);
     });
   }
@@ -281,15 +291,22 @@
           return false;
         }
         next.push(entry);
-        const trimmed = sanitizeLeaderboard(next);
-        return fetch(LEADERBOARD_API + '/' + LEADERBOARD_DOC_ID, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify({ scores: trimmed }),
+        return fetch(SUPABASE_SCORES, {
+          method: 'POST',
+          headers: supabaseHeaders({
+            'Content-Type': 'application/json',
+            Prefer: 'return=minimal',
+          }),
+          body: JSON.stringify({
+            initials: entry.initials,
+            score: entry.score,
+          }),
           signal: ctrl && ctrl.signal,
         }).then(function (res) {
           if (!res.ok) throw new Error('save http ' + res.status);
-          leaderboard = trimmed;
+          return fetchLeaderboard(ctrl && ctrl.signal);
+        }).then(function (rows) {
+          leaderboard = rows;
           leaderboardOk = true;
           return true;
         });
