@@ -29,6 +29,10 @@
   const SLAP_IMPACT_AT = 16;
   const SLAP_TEXT_AT = 44;
   const BEST_KEY = 'pklap-best-score';
+  const LEADERBOARD_SIZE = 10;
+  const LEADERBOARD_API =
+    'https://crudcrud.com/api/4fe0dcc1fe994c67b40c6d568278c3f9/leaderboard';
+  const LEADERBOARD_DOC_ID = '6a970433188cb503e8368310';
 
   const COMMODITIES = [
     { id: 'corn', name: 'Corn', color: '#f4d03f' },
@@ -59,6 +63,11 @@
   let slapTime = 0;
   let shakeMag = 0;
   let channelPoints = [];
+  let leaderboard = [];
+  let leaderboardOk = false;
+  let nameEntry = false;
+  let askedForInitials = false;
+  let saveStatus = '';
 
   const player = {
     y: HEIGHT / 2,
@@ -174,7 +183,159 @@
     player.vy = 0;
     player.rotation = 0;
     player.knockX = 0;
+    nameEntry = false;
+    askedForInitials = false;
+    saveStatus = '';
+    hideInitialsOverlay();
     rebuildChannel();
+  }
+
+  function normalizeInitials(value) {
+    return String(value || '')
+      .toUpperCase()
+      .replace(/[^A-Z]/g, '')
+      .slice(0, 2);
+  }
+
+  function sanitizeLeaderboard(raw) {
+    const list = Array.isArray(raw) ? raw : Array.isArray(raw && raw.scores) ? raw.scores : [];
+    return list
+      .map(function (row) {
+        return {
+          initials: normalizeInitials(row && row.initials),
+          score: Math.floor(Number(row && row.score) || 0),
+        };
+      })
+      .filter(function (row) {
+        return row.initials.length === 2 && row.score >= 0 && row.score < 10000000;
+      })
+      .sort(function (a, b) {
+        return b.score - a.score;
+      })
+      .slice(0, LEADERBOARD_SIZE);
+  }
+
+  function qualifiesForLeaderboard(value) {
+    if (!leaderboardOk) return false;
+    if (leaderboard.length < LEADERBOARD_SIZE) return value > 0;
+    return value > leaderboard[leaderboard.length - 1].score;
+  }
+
+  function fetchLeaderboard(signal) {
+    return fetch(LEADERBOARD_API, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      signal: signal,
+    }).then(function (res) {
+      if (!res.ok) throw new Error('leaderboard http ' + res.status);
+      return res.json();
+    }).then(function (data) {
+      if (Array.isArray(data)) {
+        const doc =
+          data.filter(function (row) {
+            return row && row._id === LEADERBOARD_DOC_ID;
+          })[0] || data[0];
+        return sanitizeLeaderboard(doc || { scores: [] });
+      }
+      return sanitizeLeaderboard(data);
+    });
+  }
+
+  function loadLeaderboard() {
+    const ctrl = window.AbortController ? new AbortController() : null;
+    const timer = setTimeout(function () {
+      if (ctrl) ctrl.abort();
+    }, 4000);
+
+    const req = fetchLeaderboard(ctrl && ctrl.signal);
+    return req
+      .then(function (rows) {
+        leaderboard = rows;
+        leaderboardOk = true;
+      })
+      .catch(function () {
+        leaderboardOk = false;
+        leaderboard = [];
+      })
+      .then(function () {
+        clearTimeout(timer);
+      });
+  }
+
+  function saveScore(initials, value) {
+    const entry = { initials: normalizeInitials(initials), score: Math.floor(value) };
+    if (entry.initials.length !== 2) return Promise.resolve(false);
+
+    const ctrl = window.AbortController ? new AbortController() : null;
+    const timer = setTimeout(function () {
+      if (ctrl) ctrl.abort();
+    }, 4000);
+
+    return fetchLeaderboard(ctrl && ctrl.signal)
+      .then(function (latest) {
+        const next = latest.slice();
+        const tenth = next.length === LEADERBOARD_SIZE ? next[next.length - 1].score : -1;
+        if (next.length >= LEADERBOARD_SIZE && entry.score <= tenth) {
+          leaderboard = next;
+          leaderboardOk = true;
+          return false;
+        }
+        next.push(entry);
+        const trimmed = sanitizeLeaderboard(next);
+        return fetch(LEADERBOARD_API + '/' + LEADERBOARD_DOC_ID, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ scores: trimmed }),
+          signal: ctrl && ctrl.signal,
+        }).then(function (res) {
+          if (!res.ok) throw new Error('save http ' + res.status);
+          leaderboard = trimmed;
+          leaderboardOk = true;
+          return true;
+        });
+      })
+      .catch(function () {
+        return false;
+      })
+      .then(function (ok) {
+        clearTimeout(timer);
+        return ok;
+      });
+  }
+
+  function showInitialsOverlay() {
+    const overlay = document.getElementById('initials-overlay');
+    const input = document.getElementById('initials-input');
+    if (!overlay || !input) return;
+    overlay.hidden = false;
+    input.value = '';
+    setTimeout(function () {
+      input.focus();
+      input.select();
+    }, 30);
+  }
+
+  function hideInitialsOverlay() {
+    const overlay = document.getElementById('initials-overlay');
+    const input = document.getElementById('initials-input');
+    if (overlay) overlay.hidden = true;
+    if (input) input.blur();
+    canvas.focus();
+  }
+
+  function finishNameEntry() {
+    nameEntry = false;
+    hideInitialsOverlay();
+  }
+
+  function submitInitials(raw) {
+    const initials = normalizeInitials(raw);
+    if (initials.length !== 2 || saveStatus === 'saving') return;
+    saveStatus = 'saving';
+    saveScore(initials, Math.floor(score)).then(function (ok) {
+      saveStatus = ok ? 'saved' : 'failed';
+      finishNameEntry();
+    });
   }
 
   function startPlaying() {
@@ -196,7 +357,7 @@
       player.vy = flapForce();
     }
     if (state === STATE.GAMEOVER) {
-      if (slapTime < SLAP_TEXT_AT) return;
+      if (nameEntry || slapTime < SLAP_TEXT_AT) return;
       state = STATE.PLAYING;
       resetGame();
     }
@@ -295,6 +456,14 @@
       } else if (slapTime >= SLAP_IMPACT_AT) {
         shakeMag *= 0.82;
         player.knockX += 3 * dt;
+      }
+      if (slapTime >= SLAP_TEXT_AT && !askedForInitials) {
+        askedForInitials = true;
+        if (qualifiesForLeaderboard(Math.floor(score))) {
+          nameEntry = true;
+          saveStatus = '';
+          showInitialsOverlay();
+        }
       }
     }
   }
@@ -821,6 +990,44 @@
     ctx.font = '9px "Press Start 2P", monospace';
     ctx.fillText('Stay between IMPORT and EXPORT', WIDTH / 2, HEIGHT - 36);
     ctx.fillText('Dodge the AMIM bombs', WIDTH / 2, HEIGHT - 18);
+
+    drawLeaderboard(WIDTH / 2, 286);
+  }
+
+  function drawLeaderboard(centerX, topY) {
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#f1c40f';
+    ctx.font = '10px "Press Start 2P", monospace';
+    ctx.fillText('TOP 10', centerX, topY);
+
+    if (!leaderboardOk) {
+      ctx.fillStyle = '#7f8c8d';
+      ctx.font = '8px "Press Start 2P", monospace';
+      ctx.fillText('scores unavailable', centerX, topY + 22);
+      return;
+    }
+
+    if (!leaderboard.length) {
+      ctx.fillStyle = '#95a5a6';
+      ctx.font = '8px "Press Start 2P", monospace';
+      ctx.fillText('no scores yet', centerX, topY + 22);
+      return;
+    }
+
+    ctx.font = '8px "Press Start 2P", monospace';
+    const colW = 210;
+    for (let i = 0; i < leaderboard.length; i++) {
+      const col = i < 5 ? 0 : 1;
+      const row = i < 5 ? i : i - 5;
+      const x = centerX + (col === 0 ? -colW / 2 : colW / 2);
+      const y = topY + 20 + row * 16;
+      const rank = String(i + 1).padStart(2, ' ');
+      ctx.textAlign = 'left';
+      ctx.fillStyle = i === 0 ? '#f1c40f' : '#ecf0f1';
+      ctx.fillText(rank + ' ' + leaderboard[i].initials, x - 88, y);
+      ctx.textAlign = 'right';
+      ctx.fillText(String(leaderboard[i].score), x + 88, y);
+    }
   }
 
   function drawSlapHand() {
@@ -914,21 +1121,43 @@
     ctx.textAlign = 'center';
     ctx.fillStyle = '#f1c40f';
     ctx.font = '24px "Press Start 2P", monospace';
-    ctx.fillText('You got a P-Klap!', WIDTH / 2, HEIGHT / 2 - 48);
+    ctx.fillText('You got a P-Klap!', WIDTH / 2, HEIGHT / 2 - 110);
 
     ctx.fillStyle = '#ffffff';
     ctx.font = '32px "Press Start 2P", monospace';
-    ctx.fillText(String(Math.floor(score)), WIDTH / 2, HEIGHT / 2 + 12);
+    ctx.fillText(String(Math.floor(score)), WIDTH / 2, HEIGHT / 2 - 58);
 
     ctx.fillStyle = '#ffe082';
     ctx.font = '12px "Press Start 2P", monospace';
-    ctx.fillText('Best: ' + Math.floor(bestScore), WIDTH / 2, HEIGHT / 2 + 52);
+    ctx.fillText('Best: ' + Math.floor(bestScore), WIDTH / 2, HEIGHT / 2 - 24);
 
-    ctx.fillStyle = '#bdc3c7';
-    ctx.font = '10px "Press Start 2P", monospace';
-    ctx.fillText('Space / Tap to retry', WIDTH / 2, HEIGHT / 2 + 96);
-    ctx.fillStyle = '#95a5a6';
-    ctx.fillText('Press C to change commodity', WIDTH / 2, HEIGHT / 2 + 124);
+    if (nameEntry) {
+      ctx.fillStyle = '#2ecc71';
+      ctx.font = '10px "Press Start 2P", monospace';
+      ctx.fillText('New top 10 score!', WIDTH / 2, HEIGHT / 2 + 8);
+    } else {
+      if (saveStatus === 'saved') {
+        ctx.fillStyle = '#2ecc71';
+        ctx.font = '9px "Press Start 2P", monospace';
+        ctx.fillText('Leaderboard updated', WIDTH / 2, HEIGHT / 2 + 6);
+      } else if (saveStatus === 'failed') {
+        ctx.fillStyle = '#e74c3c';
+        ctx.font = '9px "Press Start 2P", monospace';
+        ctx.fillText('Could not save score', WIDTH / 2, HEIGHT / 2 + 6);
+      } else if (saveStatus === 'saving') {
+        ctx.fillStyle = '#bdc3c7';
+        ctx.font = '9px "Press Start 2P", monospace';
+        ctx.fillText('Saving...', WIDTH / 2, HEIGHT / 2 + 6);
+      }
+
+      drawLeaderboard(WIDTH / 2, HEIGHT / 2 + 28);
+
+      ctx.fillStyle = '#bdc3c7';
+      ctx.font = '10px "Press Start 2P", monospace';
+      ctx.fillText('Space / Tap to retry', WIDTH / 2, HEIGHT - 48);
+      ctx.fillStyle = '#95a5a6';
+      ctx.fillText('Press C to change commodity', WIDTH / 2, HEIGHT - 24);
+    }
   }
 
   function render() {
@@ -1014,6 +1243,7 @@
   }
 
   function onPointerDown(e) {
+    if (nameEntry) return;
     e.preventDefault();
     canvas.focus();
 
@@ -1029,6 +1259,13 @@
   }
 
   function onKeyDown(e) {
+    if (nameEntry) {
+      if (e.code === 'Escape') {
+        e.preventDefault();
+        finishNameEntry();
+      }
+      return;
+    }
     if (e.code === 'Space') {
       e.preventDefault();
       flap();
@@ -1036,6 +1273,46 @@
     if (e.code === 'KeyC' && state === STATE.GAMEOVER && slapTime >= SLAP_TEXT_AT) {
       state = STATE.MENU;
       resetGame();
+    }
+  }
+
+  function initInitialsOverlay() {
+    const overlay = document.getElementById('initials-overlay');
+    const input = document.getElementById('initials-input');
+    const skip = document.getElementById('initials-skip');
+    if (!overlay || !input) return;
+
+    overlay.addEventListener('mousedown', function (e) {
+      e.stopPropagation();
+    });
+    overlay.addEventListener('touchstart', function (e) {
+      e.stopPropagation();
+    }, { passive: true });
+
+    input.addEventListener('input', function () {
+      const cleaned = normalizeInitials(input.value);
+      if (input.value !== cleaned) input.value = cleaned;
+      if (cleaned.length === 2) submitInitials(cleaned);
+    });
+
+    input.addEventListener('keydown', function (e) {
+      e.stopPropagation();
+      if (e.code === 'Enter') {
+        e.preventDefault();
+        submitInitials(input.value);
+      }
+      if (e.code === 'Escape') {
+        e.preventDefault();
+        finishNameEntry();
+      }
+    });
+
+    if (skip) {
+      skip.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        finishNameEntry();
+      });
     }
   }
 
@@ -1053,6 +1330,8 @@
     initBackground();
     rebuildChannel();
     initLogo();
+    initInitialsOverlay();
+    loadLeaderboard();
     resizeCanvas();
 
     window.addEventListener('resize', resizeCanvas);

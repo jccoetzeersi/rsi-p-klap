@@ -14,6 +14,12 @@
     <div id="game-stage">
       <canvas id="game-canvas" tabindex="0" aria-label="P-Klap game canvas"></canvas>
       <img id="logo" src="assets/logo.jpg" alt="RSI BlackBox">
+      <div id="initials-overlay" hidden>
+        <p id="initials-title">Top 10!</p>
+        <p id="initials-hint">Enter 2 initials</p>
+        <input id="initials-input" type="text" maxlength="2" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Two initials">
+        <button type="button" id="initials-skip">Skip</button>
+      </div>
     </div>
   </div>
   <script src="js/game.js"></script>
