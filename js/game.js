@@ -30,8 +30,8 @@
   const SLAP_TEXT_AT = 44;
   const BEST_KEY = 'pklap-best-score';
   const LEADERBOARD_SIZE = 10;
-  const SUPABASE_URL = 'https://bgyllkaaaavkuyskiydp.supabase.co';
-  const SUPABASE_ANON_KEY = 'sb_publishable_s2fpA7Lr-2fc__XUMZ11JA_QwGt1wH_';
+  const SUPABASE_URL = 'https://nquxulvwpzhutqzuerkz.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_Lrp9yhXeUUnpW7sYTEpvJw_ZB9J61xh';
   const SUPABASE_SCORES = SUPABASE_URL + '/rest/v1/pklap_scores';
 
   const COMMODITIES = [
